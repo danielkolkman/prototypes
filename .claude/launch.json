@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Next.js Dev (prototypes)",
+      "cwd": "/Users/danielkolkman/cursor_projects/prototypes/prototypes",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "Expo Web (prototype_playground)",
+      "runtimeExecutable": "/opt/homebrew/bin/npm",
+      "runtimeArgs": ["--prefix", "/Users/danielkolkman/cursor_projects/prototypes/prototype_playground", "run", "web"],
+      "port": 8081
+    }
+  ]
+}
