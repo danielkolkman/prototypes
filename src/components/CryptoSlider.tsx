@@ -13,8 +13,8 @@ export function CryptoSlider({ percentage, onChange }: CryptoSliderProps) {
   return (
     <Column gap="4" fillWidth>
       <Slider
-        value={percentage}
-        onChange={onChange}
+        value={[percentage]}
+        onValueChange={([value]: number[]) => onChange(value)}
         min={0}
         max={100}
         step={1}
