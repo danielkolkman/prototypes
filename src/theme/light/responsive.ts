@@ -45,9 +45,9 @@ export function lightSliderLayout(screenWidth: number): LightSliderLayout {
   // --- From tokens (numbers) ---
   const fromTokens = {
     sliderContainerHeight:
-      parseFloat(lightVariables['component/slider/height-active']) || 40,
+      parseFloat(lightVariables['component/slider/height-active']) || 32,
     sliderContainerRadius:
-      parseFloat(lightVariables['component/slider/slider-radius']) || 999,
+      parseFloat(lightVariables['component/slider/slider-radius']) || 8,
     sliderContainerRadiusOnPress:
       parseFloat(lightVariables['component/slider/slider-radius-pressed']) || 8,
     rulerHeight: parseFloat(lightVariables['component/slider/ruler-height']) || 28,

@@ -53,9 +53,9 @@ const sliderLayout = {
   stepGap: num('component/step/gap', 4),
   linkSmGap: num('component/link/sm/gap', 4),
   linkMinHeight: num('component/link/md/container-height', 20),
-  radius: num('component/slider/slider-radius', 999),
+  radius: num('component/slider/slider-radius', 8),
   radiusPressed: num('component/slider/slider-radius-pressed', 8),
-  height: num('component/slider/height-active', 40),
+  height: num('component/slider/height-active', 32),
   rulerHeight: num('component/slider/ruler-height', 28),
   rulerPaddingY: num('component/slider/ruler-padding-y', 2),
   rulerPaddingX: num('component/slider/ruler-padding-x', 12),
@@ -77,7 +77,7 @@ const sliderChrome = {
 } as const;
 
 const surface = {
-  bgLow: v['surface/bg-low'],
+  bgLow: v['surface/bg'],
 } as const;
 
 const border = {

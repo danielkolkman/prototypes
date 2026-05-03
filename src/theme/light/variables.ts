@@ -60,9 +60,9 @@ const sliderChrome = {
 // Slider — layout & motion (`component/slider/*`, lowercase path)
 // -----------------------------------------------------------------------------
 const sliderLayout = {
-  'component/slider/slider-radius': '999',
+  'component/slider/slider-radius': '8',
   'component/slider/slider-radius-pressed': '8',
-  'component/slider/height-active': '40',
+  'component/slider/height-active': '32',
   'component/slider/ruler-height': '28',
   'component/slider/ruler-padding-y': '2',
   'component/slider/ruler-padding-x': '12',
@@ -85,6 +85,7 @@ const linksAndSteps = {
 // -----------------------------------------------------------------------------
 const surface = {
   'surface/bg-low': '#ffffff',
+  'surface/bg': '#ffffff',
   'border/default': '#f5f5f5',
   'effect/shadow': '#000000',
 } as const;

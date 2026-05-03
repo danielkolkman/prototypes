@@ -81,6 +81,7 @@ const linksAndSteps = {
 // -----------------------------------------------------------------------------
 const surface = {
   'surface/bg-low': '#0e0c12',
+  'surface/bg': '#000000',
   'border/default': '#2a2536',
   'effect/shadow': '#000000',
 } as const;

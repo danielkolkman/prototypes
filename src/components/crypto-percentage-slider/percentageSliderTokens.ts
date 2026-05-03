@@ -18,9 +18,10 @@
  * **track slot** in `PercentageSlider`: the slot is fixed at this size so the
  * track can grow upward from the bottom without shifting content below.
  */
-const sliderContainerHeight = 40;
-const sliderContainerRadius = 999;
-/** Track corner radius while pressed / dragging (expanded height). */
+const sliderContainerHeight = 32;
+/** Outer track + fill layers (collapsed and expanded). */
+const sliderContainerRadius = 8;
+/** Low end of height ↔ radius animation (match expanded for constant 8pt chrome). */
 const sliderContainerRadiusOnPress = 8;
 
 /** Resting track height before drag; springs to `sliderContainerHeight` while pressed. */
@@ -108,11 +109,16 @@ const tickPercents = [25, 50, 75] as const;
 const snapPoints = [0, 25, 50, 75, 100] as const;
 
 /**
- * If the finger lands within this many **percentage points** of a snap value,
- * the value snaps on release. Smaller = stricter (must be closer to snap).
- * (The property name says “Px” for historical reasons.)
+ * Minimum slack in **percentage points** (used with pixel slack below). Keeps quarter
+ * marks easy to hit on very wide tracks where px→% is tiny.
  */
-const snapThresholdPx = 4;
+const snapThresholdPx = 8;
+
+/**
+ * Extra slack in **track pixels** on release: converted to % via track width so snapping
+ * feels consistent across screen sizes (narrower track = wider % magnet).
+ */
+const snapSlackTrackPx = 18;
 
 // -----------------------------------------------------------------------------
 // Motion — `Animated.spring` for thumb fill
@@ -250,6 +256,7 @@ export const percentageSliderTokens = {
   // Snapping
   snapPoints,
   snapThresholdPx,
+  snapSlackTrackPx,
 
   // Motion
   spring: {

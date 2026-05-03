@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -68,7 +68,7 @@ function createSliderStyles(m: SliderLayout) {
       position: 'relative',
       width: '100%',
     },
-    /** Clips track fills; `borderRadius` is set inline (idle vs pressed). */
+    /** Clips track fills; `borderRadius` is driven by `trackChromeBorderRadiusAnim` (synced to track height). */
     trackFillClip: {
       overflow: 'hidden',
     },
@@ -104,11 +104,14 @@ interface Props {
   onMaxPress?: () => void;
 }
 
-function snapToNearest(pct: number): number {
+function snapToNearest(pct: number, trackWidthPx: number): number {
+  if (trackWidthPx <= 0) return pct;
   const nearest = [...t.snapPoints].reduce((prev, curr) =>
     Math.abs(curr - pct) < Math.abs(prev - pct) ? curr : prev,
   );
-  return Math.abs(nearest - pct) < t.snapThresholdPx ? nearest : pct;
+  const pxSlackAsPct = (t.snapSlackTrackPx / trackWidthPx) * 100;
+  const slackPct = Math.max(t.snapThresholdPx, pxSlackAsPct);
+  return Math.abs(nearest - pct) <= slackPct ? nearest : pct;
 }
 
 function interpolateThumbLeft(
@@ -143,29 +146,12 @@ function interpolateThumbLeft(
   const g1 = raw(1);
   const lowerBound = Math.min(0, g0);
   const out0 = Math.max(lowerBound, Math.min(maxL, g0));
-  const out1 = Math.max(lowerBound, Math.min(maxL, g1));
+  /** Do not clamp `g1` to `maxL`: that plateaued the handle around ~(1 − clusterW/2W) (≈90%) while value went to 100%. */
+  const out1 = Math.max(lowerBound, g1);
 
-  const fHighRaw = ((maxL + anchorX) / W - p0) / denom;
-  const fHigh = Math.min(1, Math.max(0, fHighRaw));
-
-  if (g1 <= maxL) {
-    return animatedValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [out0, out1],
-      extrapolate: 'clamp',
-    });
-  }
-
-  if (fHigh >= 1 - eps || fHigh <= eps) {
-    return animatedValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [out0, out1],
-      extrapolate: 'clamp',
-    });
-  }
   return animatedValue.interpolate({
-    inputRange: [0, fHigh, 1],
-    outputRange: [out0, maxL, maxL],
+    inputRange: [0, 1],
+    outputRange: [out0, out1],
     extrapolate: 'clamp',
   });
 }
@@ -195,17 +181,17 @@ export function PercentageSlider({
     setDragging(next);
   }).current;
   const [livePct, setLivePct] = useState(initial);
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
 
   const trackHeightAnim = useRef(
     new Animated.Value(t.sliderTrackHeightCollapsed),
   ).current;
 
-  /** Split track + primary chrome (Core Components “Active” at >0% or while dragging). */
+  /** Split track + primary chrome (active fill at >0% or while dragging; both themes). */
   const showActiveChrome = useMemo(
-    () =>
-      dragging ||
-      (themeId === 'light' && Math.round(livePct) > 0),
-    [dragging, themeId, livePct],
+    () => dragging || Math.round(livePct) > 0,
+    [dragging, livePct],
   );
 
   const styles = useMemo(() => createSliderStyles(m as SliderLayout), [m]);
@@ -303,6 +289,35 @@ export function PercentageSlider({
     [heightOk, hCollapsed, hExpanded, m.rulerHeight, trackHeightAnim],
   );
 
+  /** Same driver as height spring — avoids radius snapping on `dragging` while height is mid-flight. */
+  const trackChromeBorderRadiusAnim = useMemo(
+    () =>
+      heightOk
+        ? trackHeightAnim.interpolate({
+            inputRange: [hCollapsed, hExpanded],
+            outputRange: [
+              m.sliderContainerRadiusOnPress,
+              m.sliderContainerRadius,
+            ],
+            extrapolate: 'clamp',
+          })
+        : trackHeightAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [
+              m.sliderContainerRadiusOnPress,
+              m.sliderContainerRadius,
+            ],
+          }),
+    [
+      heightOk,
+      hCollapsed,
+      hExpanded,
+      m.sliderContainerRadius,
+      m.sliderContainerRadiusOnPress,
+      trackHeightAnim,
+    ],
+  );
+
   const palette = useMemo(
     () =>
       StyleSheet.create({
@@ -312,14 +327,20 @@ export function PercentageSlider({
         },
         inactiveUniform: {
           backgroundColor: colors.sliderInactiveUniform,
+          borderRadius: m.sliderContainerRadius,
+          overflow: 'hidden',
         },
         trackBase: {
           backgroundColor: colors.sliderTrackBase,
+          borderRadius: m.sliderContainerRadius,
+          overflow: 'hidden',
         },
         draggingFill: {
           backgroundColor: colors.sliderDraggingFill,
           borderRightWidth: 1,
           borderRightColor: colors.sliderDraggingFillBorder,
+          borderRadius: m.sliderContainerRadius,
+          overflow: 'hidden',
         },
         rulerInactive: {
           backgroundColor: colors.sliderRulerInactive,
@@ -343,7 +364,7 @@ export function PercentageSlider({
           color: colors.accent,
         },
       }),
-    [colors],
+    [colors, m.sliderContainerRadius],
   );
 
   /** `Animated.View` — typed loosely so `measure` is available on the native node. */
@@ -361,10 +382,60 @@ export function PercentageSlider({
   onChangeRef.current = onChange;
 
   const animatedValue = useRef(new Animated.Value(initial / 100)).current;
+  const maxAnimListenerIdRef = useRef<string | null>(null);
+  /** While Max spring runs, parent already has 100% — skip sync effect so we don't snap `animatedValue` mid-spring. */
+  const maxSpringActiveRef = useRef(false);
+
+  const clearMaxAnimListener = () => {
+    if (maxAnimListenerIdRef.current !== null) {
+      animatedValue.removeListener(maxAnimListenerIdRef.current);
+      maxAnimListenerIdRef.current = null;
+    }
+  };
+
+  const handleMaxPress = useCallback(() => {
+    if (!onChangeRef.current) {
+      onMaxPress?.();
+      return;
+    }
+    clearMaxAnimListener();
+    animatedValue.stopAnimation(current => {
+      const target = 1;
+      if (Math.abs(current - target) < 1e-3) {
+        setLivePct(100);
+        onChangeRef.current?.(100);
+        onMaxPress?.();
+        return;
+      }
+      maxSpringActiveRef.current = true;
+      onChangeRef.current?.(100);
+      setLivePct(100);
+      Animated.spring(animatedValue, {
+        toValue: target,
+        useNativeDriver: false,
+        speed: t.spring.onRelease.speed,
+        bounciness: t.spring.onRelease.bounciness,
+      }).start(({ finished }) => {
+        if (finished) {
+          setLivePct(100);
+          animatedValue.setValue(1);
+          onMaxPress?.();
+        } else {
+          const v = initialRef.current;
+          setLivePct(v);
+          animatedValue.setValue(v / 100);
+        }
+        maxSpringActiveRef.current = false;
+      });
+    });
+  }, [animatedValue, onMaxPress]);
 
   /** Sync controlled `value` from parent. Do not depend on `dragging`: when it goes false, `initial` can still be one frame behind `onChange`, which would overwrite the gesture result. */
   useEffect(() => {
     if (draggingRef.current) {
+      return;
+    }
+    if (maxSpringActiveRef.current) {
       return;
     }
     setLivePct(initial);
@@ -374,9 +445,11 @@ export function PercentageSlider({
   const update = useRef((screenX: number, release: boolean) => {
     const tw = trackWidthRef.current;
     if (tw === 0) return;
+    clearMaxAnimListener();
+    maxSpringActiveRef.current = false;
     const x = screenX - trackPageXRef.current;
     const pct = Math.max(0, Math.min(100, (x / tw) * 100));
-    const next = release ? snapToNearest(pct) : pct;
+    const next = release ? snapToNearest(pct, tw) : pct;
     setLivePct(next);
     const spring = release ? t.spring.onRelease : t.spring.whileDragging;
     Animated.spring(animatedValue, {
@@ -431,6 +504,8 @@ export function PercentageSlider({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (_, gestureState) => {
         gestureEndedRef.current = false;
+        clearMaxAnimListener();
+        maxSpringActiveRef.current = false;
         const grantToken = ++layoutTokenRef.current;
         setDraggingTracked(true);
         trackRef.current?.measure(
@@ -538,11 +613,6 @@ export function PercentageSlider({
     [m.trackFillLayerZ, m.trackFillLayerElevation],
   );
 
-  const trackChromeRadius = useMemo(
-    () => (dragging ? m.sliderContainerRadiusOnPress : m.sliderContainerRadius),
-    [dragging, m.sliderContainerRadius, m.sliderContainerRadiusOnPress],
-  );
-
   const trackSlotAnchorCollapsedRef = useRef(
     new Animated.Value(m.sliderTrackHeightCollapsed),
   ).current;
@@ -575,9 +645,9 @@ export function PercentageSlider({
             {displayPct}%
           </Text>
         </View>
-        {onMaxPress ? (
+        {onChange || onMaxPress ? (
           <TouchableOpacity
-            onPress={onMaxPress}
+            onPress={handleMaxPress}
             hitSlop={{
               top: t.maxLinkHitSlop,
               bottom: t.maxLinkHitSlop,
@@ -605,7 +675,7 @@ export function PercentageSlider({
           style={[
             styles.slideOuter,
             palette.slideOuter,
-            { height: trackHeightAnim, borderRadius: trackChromeRadius },
+            { height: trackHeightAnim, borderRadius: trackChromeBorderRadiusAnim },
           ]}
           onLayout={(e: LayoutChangeEvent) => {
             const w = e.nativeEvent.layout.width;
@@ -677,13 +747,13 @@ export function PercentageSlider({
           </Animated.View>
         </Animated.View>
 
-        <View
+        <Animated.View
           pointerEvents="box-none"
           style={[
             StyleSheet.absoluteFill,
             trackOverlayZ,
             styles.trackFillClip,
-            { borderRadius: trackChromeRadius },
+            { borderRadius: trackChromeBorderRadiusAnim },
           ]}
         >
           {!showActiveChrome ? (
@@ -729,7 +799,7 @@ export function PercentageSlider({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
 
         </Animated.View>
       </Animated.View>
