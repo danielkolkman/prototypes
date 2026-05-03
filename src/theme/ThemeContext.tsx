@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import type { ThemeColors } from './colors.types';
 import { darkColors } from './dark/colors';
 import { lightColors } from './light/colors';
