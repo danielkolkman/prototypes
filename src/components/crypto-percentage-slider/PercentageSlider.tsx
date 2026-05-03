@@ -1,7 +1,6 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Animated,
-  GestureResponderEvent,
   LayoutChangeEvent,
   PanResponder,
   StyleSheet,
@@ -16,41 +15,58 @@ interface Props {
 const THUMB_SIZE = 28;
 const TRACK_HEIGHT = 4;
 const SNAP_POINTS = [0, 25, 50, 75, 100];
+const SNAP_THRESHOLD = 8;
+
+function snapToNearest(pct: number): number {
+  const nearest = SNAP_POINTS.reduce((prev, curr) =>
+    Math.abs(curr - pct) < Math.abs(prev - pct) ? curr : prev,
+  );
+  return Math.abs(nearest - pct) < SNAP_THRESHOLD ? nearest : pct;
+}
 
 export function PercentageSlider({ value: initial = 0, onChange }: Props) {
   const [trackWidth, setTrackWidth] = useState(0);
+
+  const trackRef = useRef<View>(null);
+  const trackWidthRef = useRef(0);
+  const trackPageXRef = useRef(0);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   const animatedValue = useRef(new Animated.Value(initial / 100)).current;
 
-  const snap = useCallback((raw: number): number => {
-    const nearest = SNAP_POINTS.reduce((prev, curr) =>
-      Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev,
-    );
-    return Math.abs(nearest - raw) < 8 ? nearest : raw;
-  }, []);
-
-  const update = useCallback(
-    (x: number, release: boolean) => {
-      if (trackWidth === 0) return;
-      const pct = Math.max(0, Math.min(100, (x / trackWidth) * 100));
-      const next = release ? snap(pct) : pct;
-      Animated.spring(animatedValue, {
-        toValue: next / 100,
-        useNativeDriver: false,
-        speed: release ? 20 : 100,
-        bounciness: release ? 4 : 0,
-      }).start();
-      onChange?.(Math.round(next));
-    },
-    [animatedValue, onChange, snap, trackWidth],
-  );
+  const update = useRef((screenX: number, release: boolean) => {
+    const tw = trackWidthRef.current;
+    if (tw === 0) return;
+    const x = screenX - trackPageXRef.current;
+    const pct = Math.max(0, Math.min(100, (x / tw) * 100));
+    const next = release ? snapToNearest(pct) : pct;
+    Animated.spring(animatedValue, {
+      toValue: next / 100,
+      useNativeDriver: false,
+      speed: release ? 20 : 100,
+      bounciness: release ? 4 : 0,
+    }).start();
+    onChangeRef.current?.(Math.round(next));
+  }).current;
 
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e: GestureResponderEvent) => update(e.nativeEvent.locationX, false),
-      onPanResponderMove: (e: GestureResponderEvent) => update(e.nativeEvent.locationX, false),
-      onPanResponderRelease: (e: GestureResponderEvent) => update(e.nativeEvent.locationX, true),
+      onPanResponderGrant: (_, gestureState) => {
+        // Measure track position fresh on each gesture start
+        trackRef.current?.measure((_x, _y, _w, _h, pageX) => {
+          trackPageXRef.current = pageX;
+          update(gestureState.x0, false);
+        });
+      },
+      onPanResponderMove: (_, gestureState) => {
+        update(gestureState.moveX, false);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        update(gestureState.moveX, true);
+      },
     }),
   ).current;
 
@@ -66,8 +82,13 @@ export function PercentageSlider({ value: initial = 0, onChange }: Props) {
 
   return (
     <View
+      ref={trackRef}
       style={styles.track}
-      onLayout={(e: LayoutChangeEvent) => setTrackWidth(e.nativeEvent.layout.width)}
+      onLayout={(e: LayoutChangeEvent) => {
+        const w = e.nativeEvent.layout.width;
+        trackWidthRef.current = w;
+        setTrackWidth(w);
+      }}
       {...pan.panHandlers}
     >
       <View style={styles.rail} />
