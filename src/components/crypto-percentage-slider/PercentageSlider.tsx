@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Animated,
   Easing,
@@ -217,6 +224,8 @@ export function PercentageSlider({
   const pillTranslateY = useRef(
     new Animated.Value(t.pillDragRestTranslateY + t.pillHiddenOffsetY),
   ).current;
+  /** 0 = inactive track chrome, 1 = active track + fill — crossfades around 0% / 100% instead of hard-switching. */
+  const chromeBlend = useRef(new Animated.Value(initial > 0 ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.timing(headerOpacity, {
@@ -227,23 +236,17 @@ export function PercentageSlider({
   }, [dragging, headerOpacity]);
 
   useEffect(() => {
+    trackHeightAnim.stopAnimation();
     const toH = dragging
       ? m.sliderContainerHeight
       : m.sliderTrackHeightCollapsed;
     Animated.spring(trackHeightAnim, {
       toValue: toH,
       useNativeDriver: false,
-      speed: m.sliderTrackHeightSpring.speed,
-      bounciness: m.sliderTrackHeightSpring.bounciness,
+      speed: t.sliderTrackHeightSpring.speed,
+      bounciness: t.sliderTrackHeightSpring.bounciness,
     }).start();
-  }, [
-    dragging,
-    m.sliderContainerHeight,
-    m.sliderTrackHeightCollapsed,
-    m.sliderTrackHeightSpring.bounciness,
-    m.sliderTrackHeightSpring.speed,
-    trackHeightAnim,
-  ]);
+  }, [dragging, m.sliderContainerHeight, m.sliderTrackHeightCollapsed, trackHeightAnim]);
 
   useEffect(() => {
     const duration = dragging ? t.pillAnimateInMs : t.pillAnimateOutMs;
@@ -268,23 +271,44 @@ export function PercentageSlider({
     ]).start();
   }, [dragging, pillOpacity, pillTranslateY]);
 
+  /**
+   * Crossfade inactive ↔ active track chrome. Uses the JS driver so it composes cleanly with
+   * layout-driven fills (`fillWidth`, `trackChromeBorderRadiusAnim`). Stops any in-flight blend
+   * before starting a new target to avoid stuck / flicker when `showActiveChrome` flips quickly.
+   */
+  useLayoutEffect(() => {
+    chromeBlend.stopAnimation();
+    const to = showActiveChrome ? 1 : 0;
+    Animated.timing(chromeBlend, {
+      toValue: to,
+      duration: showActiveChrome ? 120 : t.pillAnimateOutMs,
+      easing: showActiveChrome
+        ? Easing.out(Easing.cubic)
+        : Easing.in(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [showActiveChrome, chromeBlend]);
+
   const hCollapsed = m.sliderTrackHeightCollapsed;
   const hExpanded = m.sliderContainerHeight;
   const heightOk = hExpanded > hCollapsed + 0.5;
 
-  const thumbChromeScale = useMemo(
+  const inactiveTrackOpacity = useMemo(
     () =>
-      heightOk
-        ? trackHeightAnim.interpolate({
-            inputRange: [hCollapsed, hExpanded],
-            outputRange: [hCollapsed / hExpanded, 1],
-            extrapolate: 'clamp',
-          })
-        : trackHeightAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [1, 1],
-          }),
-    [heightOk, hCollapsed, hExpanded, trackHeightAnim],
+      chromeBlend.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 0],
+      }),
+    [chromeBlend],
+  );
+
+  const activeTrackOpacity = useMemo(
+    () =>
+      chromeBlend.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+      }),
+    [chromeBlend],
   );
 
   const rulerHeightAnim = useMemo(
@@ -763,10 +787,7 @@ export function PercentageSlider({
               bottom: pillBottomAnim,
               alignSelf: 'center',
               opacity: pillOpacity,
-              transform: [
-                { translateY: pillTranslateY },
-                { scale: thumbChromeScale },
-              ],
+              transform: [{ translateY: pillTranslateY }],
             }}
           >
             <View
@@ -809,30 +830,37 @@ export function PercentageSlider({
             { borderRadius: trackChromeBorderRadiusAnim },
           ]}
         >
-          {!showActiveChrome ? (
-            <View style={[StyleSheet.absoluteFill, palette.inactiveUniform]} />
-          ) : (
-            <>
-              <View style={[StyleSheet.absoluteFill, palette.trackBase]} />
-              <Animated.View
-                style={[
-                  styles.draggingFill,
-                  palette.draggingFill,
-                  {
-                    width: fillWidth,
-                    borderTopLeftRadius: trackChromeBorderRadiusAnim,
-                    borderBottomLeftRadius: trackChromeBorderRadiusAnim,
-                    borderTopRightRadius: 0,
-                    borderBottomRightRadius: 0,
-                  },
-                ]}
-              />
-            </>
-          )}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              palette.inactiveUniform,
+              { opacity: inactiveTrackOpacity },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { opacity: activeTrackOpacity }]}
+          >
+            <View style={[StyleSheet.absoluteFill, palette.trackBase]} />
+            <Animated.View
+              style={[
+                styles.draggingFill,
+                palette.draggingFill,
+                {
+                  width: fillWidth,
+                  borderTopLeftRadius: trackChromeBorderRadiusAnim,
+                  borderBottomLeftRadius: trackChromeBorderRadiusAnim,
+                  borderTopRightRadius: 0,
+                  borderBottomRightRadius: 0,
+                },
+              ]}
+            />
+          </Animated.View>
 
           <View style={styles.tickRow} pointerEvents="none">
             {t.tickPercents.map(pct => {
-              const onFill = showActiveChrome && livePct > pct;
+              const onFill = livePct > pct;
               const half = t.tickSize / 2;
               const left =
                 trackWidth > 0 ? (pct / 100) * trackWidth - half : 0;

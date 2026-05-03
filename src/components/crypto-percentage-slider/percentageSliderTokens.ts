@@ -1,8 +1,11 @@
 /**
  * Design tokens for `PercentageSlider` — layout, motion, stacking, typography,
- * snapping, and thumb geometry. **Semantic colors** live in `ThemeColors` / theme
- * files; this module only holds numbers, weights, and motion that belong to the
- * slider control.
+ * snapping, and thumb geometry. **Semantic colors** live in `ThemeColors` /
+ * `theme/light/colors.ts` (paint) and `theme/light/theme.ts` (`colors` vs `spacing`).
+ * This module only holds numbers, weights, and motion for the slider control.
+ *
+ * **Responsive** sizes from the design system live in `theme/light/responsiveTokens.ts`
+ * and are applied via `lightSliderLayout(screenWidth)` in `theme/light/responsive.ts`.
  *
  * The exported object stays **flat** so
  * `SliderLayout = { ...percentageSliderTokens, ...lightSliderLayout(w) }`
@@ -145,14 +148,17 @@ const trackRulerLayerElevation = 2;
 // Pill — drag chip motion (translateY + opacity timings)
 // -----------------------------------------------------------------------------
 
-/** Base `translateY` for pill motion; combined with `pillHiddenOffsetY` / `pillOnPressExtraTranslateY`. */
-const pillDragRestTranslateY = -32;
+/**
+ * Base `translateY` for pill motion. With `pillOnPressExtraTranslateY` (24) this yields **0** while
+ * dragging — do not change that pair if the on-press pill height should stay fixed.
+ */
+const pillDragRestTranslateY = -24;
 
 /**
- * Added to `pillDragRestTranslateY` when idle/hidden so the chip sits further behind the track;
- * animates toward `pillDragRestTranslateY + pillOnPressExtraTranslateY` while dragging.
+ * Added to `pillDragRestTranslateY` when idle / fading out (not dragging). Smaller = pill sits
+ * higher on screen. Kept separate from `pillOnPressExtraTranslateY` so only the default position moves.
  */
-const pillHiddenOffsetY = 50;
+const pillHiddenOffsetY = 42;
 
 /** Added to `pillDragRestTranslateY` while dragging (positive = lower on screen vs base rest). */
 const pillOnPressExtraTranslateY = 24;

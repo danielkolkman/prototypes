@@ -1,9 +1,27 @@
 /**
- * Light theme responsive layout — scales slider spacing from reference width (343).
+ * Light theme **responsive layout** — `lightSliderLayout(screenWidth)` merges with
+ * static `percentageSliderTokens` in `PercentageSlider`.
+ *
+ * Shared numeric bases and clamps live in `responsiveTokens.ts`.
  */
+import {
+  LIGHT_LAYOUT_MIN_WINDOW_WIDTH,
+  LIGHT_LAYOUT_REFERENCE_WIDTH,
+  LIGHT_RULER_BORDER_RADIUS_PX,
+  LIGHT_RULER_CLUSTER_BASE_PX,
+  LIGHT_RULER_CLUSTER_SCALE_MAX,
+  LIGHT_RULER_CLUSTER_SCALE_MIN,
+  LIGHT_RULER_PADDING_BOTTOM_PX,
+  LIGHT_RULER_WIDTH_PX,
+  LIGHT_TICK_MARKS_BASE_PX,
+  LIGHT_TICK_MARKS_PADDING_CAP_RATIO,
+  LIGHT_VERTICAL_RHYTHM_SCALE_CAP,
+} from './responsiveTokens';
 import { lightVariables } from './variables';
 
-const refW = parseFloat(lightVariables['layout/reference-width']) || 343;
+const refW =
+  parseFloat(lightVariables['layout/reference-width']) ||
+  LIGHT_LAYOUT_REFERENCE_WIDTH;
 
 export interface LightSliderLayout {
   // Horizontal spacing
@@ -35,15 +53,9 @@ export interface LightSliderLayout {
 }
 
 export function lightSliderLayout(screenWidth: number): LightSliderLayout {
-  /** Use full window width so spacing scales on tablets / landscape (no artificial cap). */
-  const w = Math.max(280, screenWidth);
+  const w = Math.max(LIGHT_LAYOUT_MIN_WINDOW_WIDTH, screenWidth);
   const scale = w / refW;
 
-  const tickBase = 72;
-  /** Room for pill label on one line after column padding — keep in sync with tokens. */
-  const clusterBase = 64;
-
-  // --- From tokens (numbers) ---
   const fromTokens = {
     sliderContainerHeight:
       parseFloat(lightVariables['component/slider/height-active']) || 32,
@@ -66,15 +78,21 @@ export function lightSliderLayout(screenWidth: number): LightSliderLayout {
 
   return {
     tickMarksPaddingX: Math.round(
-      Math.min(tickBase * 1.1, Math.max(12, w * (tickBase / refW))),
+      Math.min(
+        LIGHT_TICK_MARKS_BASE_PX * LIGHT_TICK_MARKS_PADDING_CAP_RATIO,
+        Math.max(12, w * (LIGHT_TICK_MARKS_BASE_PX / refW)),
+      ),
     ),
-    rulerClusterWidth: Math.round(clusterBase * Math.min(1.08, Math.max(0.92, scale))),
+    rulerClusterWidth: Math.round(
+      LIGHT_RULER_CLUSTER_BASE_PX *
+        Math.min(LIGHT_RULER_CLUSTER_SCALE_MAX, Math.max(LIGHT_RULER_CLUSTER_SCALE_MIN, scale)),
+    ),
     ...fromTokens,
-    rulerWidth: 3,
-    rulerBorderRadius: 10,
-    statusRowGap: Math.round(8 * Math.min(1.05, scale)),
-    gapPillToRuler: Math.round(12 * Math.min(1.05, scale)),
-    rulerPaddingBottom: 5,
+    rulerWidth: LIGHT_RULER_WIDTH_PX,
+    rulerBorderRadius: LIGHT_RULER_BORDER_RADIUS_PX,
+    statusRowGap: Math.round(8 * Math.min(LIGHT_VERTICAL_RHYTHM_SCALE_CAP, scale)),
+    gapPillToRuler: Math.round(12 * Math.min(LIGHT_VERTICAL_RHYTHM_SCALE_CAP, scale)),
+    rulerPaddingBottom: LIGHT_RULER_PADDING_BOTTOM_PX,
     scale,
   };
 }

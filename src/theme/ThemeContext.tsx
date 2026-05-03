@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { Appearance } from 'react-native';
 import type { ThemeColors } from './colors.types';
 import { darkColors } from './dark/colors';
 import { lightColors } from './light/colors';
@@ -20,6 +27,10 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeId, setThemeId] = useState<ThemeId>('dark');
+
+  useLayoutEffect(() => {
+    Appearance.setColorScheme(themeId === 'dark' ? 'dark' : 'light');
+  }, [themeId]);
 
   const value = useMemo<ThemeContextValue>(() => {
     const colors: ThemeColors =
