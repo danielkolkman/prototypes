@@ -35,7 +35,8 @@ export interface LightSliderLayout {
 }
 
 export function lightSliderLayout(screenWidth: number): LightSliderLayout {
-  const w = Math.max(280, Math.min(screenWidth, 560));
+  /** Use full window width so spacing scales on tablets / landscape (no artificial cap). */
+  const w = Math.max(280, screenWidth);
   const scale = w / refW;
 
   const tickBase = 72;

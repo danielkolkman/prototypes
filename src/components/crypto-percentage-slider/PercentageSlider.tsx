@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { hapticLight, hapticMedium } from '../../utils/haptics';
 import { lightSliderLayout } from '../../theme/light/responsive';
 import { useTheme } from '../../theme/ThemeContext';
 import { percentageSliderTokens as t } from './percentageSliderTokens';
@@ -21,11 +22,15 @@ type SliderLayout = typeof t & ReturnType<typeof lightSliderLayout>;
 function createSliderStyles(m: SliderLayout) {
   return StyleSheet.create({
     wrapper: {
+      width: '100%',
+      alignSelf: 'stretch',
       gap: m.sliderStatusToTrackGap,
       marginBottom: t.sliderStackMarginBottom,
     },
     statusRow: {
       flexDirection: 'row',
+      alignSelf: 'stretch',
+      width: '100%',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: m.statusRowGap,
@@ -60,7 +65,18 @@ function createSliderStyles(m: SliderLayout) {
      */
     trackSlot: {
       width: '100%',
+      alignSelf: 'stretch',
       overflow: 'visible',
+    },
+    /**
+     * Pan target: full width of the slot (no horizontal padding — that used to shrink the track
+     * by 2× hit-expansion). Vertical padding + negative margin still eases vertical grab.
+     */
+    trackPanShell: {
+      alignSelf: 'stretch',
+      width: '100%',
+      marginVertical: -m.sliderTrackHitExpansionPt,
+      paddingVertical: m.sliderTrackHitExpansionPt,
     },
     slideOuter: {
       borderWidth: m.sliderTrackBorderWidth,
@@ -339,7 +355,6 @@ export function PercentageSlider({
           backgroundColor: colors.sliderDraggingFill,
           borderRightWidth: 1,
           borderRightColor: colors.sliderDraggingFillBorder,
-          borderRadius: m.sliderContainerRadius,
           overflow: 'hidden',
         },
         rulerInactive: {
@@ -378,6 +393,10 @@ export function PercentageSlider({
   const layoutTokenRef = useRef(0);
   /** Prevents `release` + `terminate` from both bumping the token and dropping the only `update` call. */
   const gestureEndedRef = useRef(false);
+  /** Whole-percent step for light haptic while dragging; `null` until first move primes the baseline. */
+  const lastDragHapticRoundRef = useRef<number | null>(null);
+  /** Dedupes medium “snap value” haptics across drag + release in one gesture. */
+  const lastSnapMediumRoundedRef = useRef<number | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -394,6 +413,7 @@ export function PercentageSlider({
   };
 
   const handleMaxPress = useCallback(() => {
+    hapticMedium();
     if (!onChangeRef.current) {
       onMaxPress?.();
       return;
@@ -450,6 +470,35 @@ export function PercentageSlider({
     const x = screenX - trackPageXRef.current;
     const pct = Math.max(0, Math.min(100, (x / tw) * 100));
     const next = release ? snapToNearest(pct, tw) : pct;
+    const snapValues = t.snapPoints as readonly number[];
+    const isSnapRounded = (r: number) => snapValues.includes(r);
+    const trySnapMedium = (r: number) => {
+      if (!isSnapRounded(r)) return;
+      if (lastSnapMediumRoundedRef.current === r) return;
+      lastSnapMediumRoundedRef.current = r;
+      hapticMedium();
+    };
+
+    if (release) {
+      if (Math.abs(next - pct) > 1e-6 && snapValues.includes(next)) {
+        trySnapMedium(Math.round(next));
+      }
+      lastDragHapticRoundRef.current = null;
+      lastSnapMediumRoundedRef.current = null;
+    } else {
+      const rounded = Math.round(next);
+      if (lastDragHapticRoundRef.current === null) {
+        lastDragHapticRoundRef.current = rounded;
+      } else if (lastDragHapticRoundRef.current !== rounded) {
+        lastDragHapticRoundRef.current = rounded;
+        if (isSnapRounded(rounded)) {
+          trySnapMedium(rounded);
+        } else {
+          hapticLight();
+        }
+      }
+    }
+
     setLivePct(next);
     const spring = release ? t.spring.onRelease : t.spring.whileDragging;
     Animated.spring(animatedValue, {
@@ -504,6 +553,8 @@ export function PercentageSlider({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (_, gestureState) => {
         gestureEndedRef.current = false;
+        lastDragHapticRoundRef.current = null;
+        lastSnapMediumRoundedRef.current = null;
         clearMaxAnimListener();
         maxSpringActiveRef.current = false;
         const grantToken = ++layoutTokenRef.current;
@@ -670,20 +721,20 @@ export function PercentageSlider({
           { height: trackHeightAnim, marginTop: trackSlotMarginTopAnim },
         ]}
       >
-        <Animated.View
-          ref={trackRef as React.RefObject<View>}
-          style={[
-            styles.slideOuter,
-            palette.slideOuter,
-            { height: trackHeightAnim, borderRadius: trackChromeBorderRadiusAnim },
-          ]}
-          onLayout={(e: LayoutChangeEvent) => {
-            const w = e.nativeEvent.layout.width;
-            trackWidthRef.current = w;
-            setTrackWidth(w);
-          }}
-          {...pan.panHandlers}
-        >
+        <View style={styles.trackPanShell} {...pan.panHandlers}>
+          <Animated.View
+            ref={trackRef as React.RefObject<View>}
+            style={[
+              styles.slideOuter,
+              palette.slideOuter,
+              { height: trackHeightAnim, borderRadius: trackChromeBorderRadiusAnim },
+            ]}
+            onLayout={(e: LayoutChangeEvent) => {
+              const w = e.nativeEvent.layout.width;
+              trackWidthRef.current = w;
+              setTrackWidth(w);
+            }}
+          >
         <Animated.View
           pointerEvents="none"
           style={[thumbRailStyle, thumbClusterColumnBox, { left: thumbLeft }]}
@@ -765,7 +816,13 @@ export function PercentageSlider({
                 style={[
                   styles.draggingFill,
                   palette.draggingFill,
-                  { width: fillWidth },
+                  {
+                    width: fillWidth,
+                    borderTopLeftRadius: trackChromeBorderRadiusAnim,
+                    borderBottomLeftRadius: trackChromeBorderRadiusAnim,
+                    borderTopRightRadius: 0,
+                    borderBottomRightRadius: 0,
+                  },
                 ]}
               />
             </>
@@ -801,7 +858,8 @@ export function PercentageSlider({
           </View>
         </Animated.View>
 
-        </Animated.View>
+          </Animated.View>
+        </View>
       </Animated.View>
     </View>
   );

@@ -1,0 +1,8 @@
+source 'https://rubygems.org'
+
+ruby '>= 3.0.0'
+
+# CocoaPods via Bundler — avoids "pod: command not found" when the gem is not on your global PATH.
+# From repo root: `npm run ios:pod`  (or `cd ios && bundle install && bundle exec pod install`)
+gem 'cocoapods', '~> 1.15'
+gem 'activesupport', '>= 6.1.7.5', '< 7.1.0'
