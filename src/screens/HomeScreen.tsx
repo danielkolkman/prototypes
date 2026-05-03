@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ThemeSwitcher } from '../components/ThemeSwitcher';
+import { useTheme } from '../theme/ThemeContext';
 
 type Screen = 'CryptoSlider' | 'Button';
 
@@ -27,10 +29,72 @@ const COMPONENTS: { screen: Screen; title: string; description: string }[] = [
 ];
 
 export function HomeScreen({ onNavigate }: Props) {
+  const { colors } = useTheme();
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        safe: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        container: {
+          flex: 1,
+          padding: 24,
+        },
+        topNav: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 24,
+          minHeight: 44,
+        },
+        heading: {
+          color: colors.textPrimary,
+          fontSize: 28,
+          fontWeight: '700',
+          flex: 1,
+          marginRight: 12,
+        },
+        card: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        cardContent: {
+          flex: 1,
+        },
+        cardTitle: {
+          color: colors.textPrimary,
+          fontSize: 16,
+          fontWeight: '600',
+          marginBottom: 4,
+        },
+        cardDescription: {
+          color: colors.textSecondary,
+          fontSize: 13,
+        },
+        arrow: {
+          color: colors.textSecondary,
+          fontSize: 24,
+          marginLeft: 8,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <Text style={styles.heading}>Components</Text>
+        <View style={styles.topNav}>
+          <Text style={styles.heading}>Components</Text>
+          <ThemeSwitcher />
+        </View>
         {COMPONENTS.map(item => (
           <TouchableOpacity
             key={item.screen}
@@ -49,48 +113,3 @@ export function HomeScreen({ onNavigate }: Props) {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#0d0d0d',
-  },
-  container: {
-    flex: 1,
-    padding: 24,
-  },
-  heading: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 24,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  cardDescription: {
-    color: '#888888',
-    fontSize: 13,
-  },
-  arrow: {
-    color: '#888888',
-    fontSize: 24,
-    marginLeft: 8,
-  },
-});

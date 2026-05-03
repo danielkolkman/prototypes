@@ -1,0 +1,29 @@
+export interface ThemeColors {
+  background: string;
+  surface: string;
+  border: string;
+  textPrimary: string;
+  textSecondary: string;
+  accent: string;
+  sliderRail: string;
+  sliderFill: string;
+  sliderDot: string;
+  sliderThumbBg: string;
+  sliderThumbBorder: string;
+  sliderThumbShadow: string;
+  ghostButtonLabel: string;
+  primaryButtonLabel: string;
+  sliderContainerBg: string;
+  sliderContainerBorder: string;
+  sliderTrackBase: string;
+  sliderInactiveUniform: string;
+  sliderDraggingFill: string;
+  sliderDraggingFillBorder: string;
+  sliderRulerInactive: string;
+  sliderRulerActive: string;
+  sliderPillSecondaryBg: string;
+  sliderPillSecondaryText: string;
+  sliderPillPrimaryText: string;
+  sliderTickMuted: string;
+  sliderTickOnFill: string;
+}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TouchableOpacityProps,
 } from 'react-native';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Props extends TouchableOpacityProps {
   label: string;
@@ -21,19 +22,44 @@ export function Button({
   style,
   ...rest
 }: Props) {
+  const { colors } = useTheme();
   const isDisabled = disabled || loading;
+
+  const themed = useMemo(
+    () =>
+      StyleSheet.create({
+        primary: { backgroundColor: colors.accent },
+        secondary: {
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderColor: colors.accent,
+        },
+        ghost: { backgroundColor: 'transparent' },
+        primaryLabel: { color: colors.primaryButtonLabel },
+        secondaryLabel: { color: colors.accent },
+        ghostLabel: { color: colors.ghostButtonLabel },
+      }),
+    [colors],
+  );
 
   return (
     <TouchableOpacity
-      style={[styles.base, styles[variant], isDisabled && styles.disabled, style]}
+      style={[
+        styles.base,
+        themed[variant],
+        isDisabled && styles.disabled,
+        style,
+      ]}
       activeOpacity={0.7}
       disabled={isDisabled}
       {...rest}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#0d0d0d' : '#F7931A'} />
+        <ActivityIndicator
+          color={variant === 'primary' ? colors.primaryButtonLabel : colors.accent}
+        />
       ) : (
-        <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
+        <Text style={[styles.label, themed[`${variant}Label`]]}>{label}</Text>
       )}
     </TouchableOpacity>
   );
@@ -47,31 +73,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  primary: {
-    backgroundColor: '#F7931A',
-  },
-  secondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: '#F7931A',
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
   disabled: {
     opacity: 0.4,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  primaryLabel: {
-    color: '#0d0d0d',
-  },
-  secondaryLabel: {
-    color: '#F7931A',
-  },
-  ghostLabel: {
-    color: '#888888',
   },
 });

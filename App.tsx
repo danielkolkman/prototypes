@@ -1,20 +1,40 @@
 import React, { useState } from 'react';
+import { StatusBar } from 'react-native';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { CryptoSliderScreen } from './src/screens/CryptoSliderScreen';
 import { ButtonScreen } from './src/screens/ButtonScreen';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 
 type Screen = 'Home' | 'CryptoSlider' | 'Button';
 
-export default function App() {
+function AppContent() {
   const [screen, setScreen] = useState<Screen>('Home');
+  const { usesLightStatusBarContent } = useTheme();
 
-  if (screen === 'CryptoSlider') {
-    return <CryptoSliderScreen onBack={() => setScreen('Home')} />;
-  }
+  return (
+    <>
+      <StatusBar
+        barStyle={
+          usesLightStatusBarContent ? 'dark-content' : 'light-content'
+        }
+        backgroundColor="transparent"
+        translucent
+      />
+      {screen === 'CryptoSlider' ? (
+        <CryptoSliderScreen onBack={() => setScreen('Home')} />
+      ) : screen === 'Button' ? (
+        <ButtonScreen onBack={() => setScreen('Home')} />
+      ) : (
+        <HomeScreen onNavigate={setScreen} />
+      )}
+    </>
+  );
+}
 
-  if (screen === 'Button') {
-    return <ButtonScreen onBack={() => setScreen('Home')} />;
-  }
-
-  return <HomeScreen onNavigate={setScreen} />;
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
 }
