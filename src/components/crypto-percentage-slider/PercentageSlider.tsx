@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { hapticLight, hapticMedium } from '../../utils/haptics';
+import { hapticHeavy, hapticLight } from '../../utils/haptics';
 import { lightSliderLayout } from '../../theme/light/responsive';
 import { useTheme } from '../../theme/ThemeContext';
 import { percentageSliderTokens as t } from './percentageSliderTokens';
@@ -395,8 +395,8 @@ export function PercentageSlider({
   const gestureEndedRef = useRef(false);
   /** Whole-percent step for light haptic while dragging; `null` until first move primes the baseline. */
   const lastDragHapticRoundRef = useRef<number | null>(null);
-  /** Dedupes medium “snap value” haptics across drag + release in one gesture. */
-  const lastSnapMediumRoundedRef = useRef<number | null>(null);
+  /** Dedupes milestone (0 / 25 / 50 / 75 / 100) heavy haptics across drag + release in one gesture. */
+  const lastMilestoneHeavyRoundedRef = useRef<number | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -413,7 +413,7 @@ export function PercentageSlider({
   };
 
   const handleMaxPress = useCallback(() => {
-    hapticMedium();
+    hapticLight();
     if (!onChangeRef.current) {
       onMaxPress?.();
       return;
@@ -429,6 +429,7 @@ export function PercentageSlider({
       }
       maxSpringActiveRef.current = true;
       onChangeRef.current?.(100);
+      hapticHeavy();
       setLivePct(100);
       Animated.spring(animatedValue, {
         toValue: target,
@@ -472,19 +473,19 @@ export function PercentageSlider({
     const next = release ? snapToNearest(pct, tw) : pct;
     const snapValues = t.snapPoints as readonly number[];
     const isSnapRounded = (r: number) => snapValues.includes(r);
-    const trySnapMedium = (r: number) => {
+    const tryMilestoneHeavy = (r: number) => {
       if (!isSnapRounded(r)) return;
-      if (lastSnapMediumRoundedRef.current === r) return;
-      lastSnapMediumRoundedRef.current = r;
-      hapticMedium();
+      if (lastMilestoneHeavyRoundedRef.current === r) return;
+      lastMilestoneHeavyRoundedRef.current = r;
+      hapticHeavy();
     };
 
     if (release) {
       if (Math.abs(next - pct) > 1e-6 && snapValues.includes(next)) {
-        trySnapMedium(Math.round(next));
+        tryMilestoneHeavy(Math.round(next));
       }
       lastDragHapticRoundRef.current = null;
-      lastSnapMediumRoundedRef.current = null;
+      lastMilestoneHeavyRoundedRef.current = null;
     } else {
       const rounded = Math.round(next);
       if (lastDragHapticRoundRef.current === null) {
@@ -492,7 +493,7 @@ export function PercentageSlider({
       } else if (lastDragHapticRoundRef.current !== rounded) {
         lastDragHapticRoundRef.current = rounded;
         if (isSnapRounded(rounded)) {
-          trySnapMedium(rounded);
+          tryMilestoneHeavy(rounded);
         } else {
           hapticLight();
         }
@@ -554,9 +555,10 @@ export function PercentageSlider({
       onPanResponderGrant: (_, gestureState) => {
         gestureEndedRef.current = false;
         lastDragHapticRoundRef.current = null;
-        lastSnapMediumRoundedRef.current = null;
+        lastMilestoneHeavyRoundedRef.current = null;
         clearMaxAnimListener();
         maxSpringActiveRef.current = false;
+        hapticLight();
         const grantToken = ++layoutTokenRef.current;
         setDraggingTracked(true);
         trackRef.current?.measure(

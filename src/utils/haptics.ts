@@ -1,3 +1,10 @@
+import RNHapticFeedback, { HapticFeedbackTypes } from 'react-native-haptic-feedback';
+
+const hapticOptions = {
+  enableVibrateFallback: true,
+  ignoreAndroidSystemSettings: false,
+};
+
 /**
  * Defer so feedback still fires when called from a pan gesture (some devices coalesce haptics
  * on the same synchronous turn as touch move).
@@ -8,12 +15,32 @@ function deferHaptic(run: () => void): void {
   });
 }
 
-/** No-op placeholder after removing Expo Haptics; add react-native-haptic-feedback if you want native impact again. */
 export function hapticLight(): void {
-  deferHaptic(() => {});
+  deferHaptic(() => {
+    try {
+      RNHapticFeedback.trigger(HapticFeedbackTypes.impactLight, hapticOptions);
+    } catch {
+      /* unsupported / simulator edge cases */
+    }
+  });
 }
 
-/** No-op placeholder after removing Expo Haptics; add react-native-haptic-feedback if you want native impact again. */
 export function hapticMedium(): void {
-  deferHaptic(() => {});
+  deferHaptic(() => {
+    try {
+      RNHapticFeedback.trigger(HapticFeedbackTypes.impactMedium, hapticOptions);
+    } catch {
+      /* unsupported / simulator edge cases */
+    }
+  });
+}
+
+export function hapticHeavy(): void {
+  deferHaptic(() => {
+    try {
+      RNHapticFeedback.trigger(HapticFeedbackTypes.impactHeavy, hapticOptions);
+    } catch {
+      /* unsupported / simulator edge cases */
+    }
+  });
 }
