@@ -188,6 +188,12 @@ const sliderTrackBorderWidth = 1;
 /** `hitSlop` for the optional Max control. */
 const maxLinkHitSlop = 8;
 
+/**
+ * Vertical expansion around the track for pan gestures (`trackPanShell` padding + negative
+ * margin). Horizontal touch uses the full track width (no horizontal inset).
+ */
+const sliderTrackHitExpansionPt = 16;
+
 // -----------------------------------------------------------------------------
 // Typography — weights (RN string weights; colors from theme in component)
 // -----------------------------------------------------------------------------
@@ -290,6 +296,7 @@ export const percentageSliderTokens = {
   // Chrome & hit targets
   sliderTrackBorderWidth,
   maxLinkHitSlop,
+  sliderTrackHitExpansionPt,
 
   // Typography weights
   labelWeightRegular,

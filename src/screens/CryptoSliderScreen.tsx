@@ -13,6 +13,8 @@ import type { ThemeId } from '../theme/ThemeContext';
 
 const AVAILABLE_BALANCE = 1500;
 const BITCOIN_PRICE = 65_000;
+/** Inset from the safe-area edges for all page content (slider stays inside this band). */
+const PAGE_PADDING = 24;
 
 interface Props {
   onBack: () => void;
@@ -147,7 +149,7 @@ export function CryptoSliderScreen({ onBack }: Props) {
         },
         container: {
           flex: 1,
-          padding: 24,
+          padding: PAGE_PADDING,
         },
         topNav: {
           flexDirection: 'row',
@@ -192,6 +194,11 @@ export function CryptoSliderScreen({ onBack }: Props) {
         },
         amountBlock: {
           marginBottom: 24,
+        },
+        /** Slider + status row span the full width of the padded content column. */
+        sliderSection: {
+          alignSelf: 'stretch',
+          width: '100%',
         },
         amountSwapper: {
           height: 160,
@@ -325,12 +332,14 @@ export function CryptoSliderScreen({ onBack }: Props) {
           </View>
         </View>
 
-        <PercentageSlider
-          value={percentage}
-          onChange={handleSliderChange}
-          labelPrefix="Swap "
-          maxLabel="Max"
-        />
+        <View style={styles.sliderSection}>
+          <PercentageSlider
+            value={percentage}
+            onChange={handleSliderChange}
+            labelPrefix="Swap "
+            maxLabel="Max"
+          />
+        </View>
       </View>
     </SafeAreaView>
   );
