@@ -1,8 +1,11 @@
 /**
  * Design tokens for `PercentageSlider` — layout, motion, stacking, typography,
- * snapping, and thumb geometry. **Semantic colors** live in `ThemeColors` / theme
- * files; this module only holds numbers, weights, and motion that belong to the
- * slider control.
+ * snapping, and thumb geometry. **Semantic colors** live in `ThemeColors` /
+ * `theme/light/colors.ts` (paint) and `theme/light/theme.ts` (`colors` vs `spacing`).
+ * This module only holds numbers, weights, and motion for the slider control.
+ *
+ * **Responsive** sizes from the design system live in `theme/light/responsiveTokens.ts`
+ * and are applied via `lightSliderLayout(screenWidth)` in `theme/light/responsive.ts`.
  *
  * The exported object stays **flat** so
  * `SliderLayout = { ...percentageSliderTokens, ...lightSliderLayout(w) }`
@@ -109,16 +112,10 @@ const tickPercents = [25, 50, 75] as const;
 const snapPoints = [0, 25, 50, 75, 100] as const;
 
 /**
- * Minimum slack in **percentage points** (used with pixel slack below). Keeps quarter
- * marks easy to hit on very wide tracks where px→% is tiny.
+ * Half-width of the snap band in **percentage points** (release only). If the nearest snap
+ * is within this distance, we jump to it — e.g. for 75% with `2`, the band is 73–77.
  */
-const snapThresholdPx = 8;
-
-/**
- * Extra slack in **track pixels** on release: converted to % via track width so snapping
- * feels consistent across screen sizes (narrower track = wider % magnet).
- */
-const snapSlackTrackPx = 18;
+const snapMagnetHalfWidthPct = 2;
 
 // -----------------------------------------------------------------------------
 // Motion — `Animated.spring` for thumb fill
@@ -145,14 +142,17 @@ const trackRulerLayerElevation = 2;
 // Pill — drag chip motion (translateY + opacity timings)
 // -----------------------------------------------------------------------------
 
-/** Base `translateY` for pill motion; combined with `pillHiddenOffsetY` / `pillOnPressExtraTranslateY`. */
-const pillDragRestTranslateY = -32;
+/**
+ * Base `translateY` for pill motion. With `pillOnPressExtraTranslateY` (24) this yields **0** while
+ * dragging — do not change that pair if the on-press pill height should stay fixed.
+ */
+const pillDragRestTranslateY = -24;
 
 /**
- * Added to `pillDragRestTranslateY` when idle/hidden so the chip sits further behind the track;
- * animates toward `pillDragRestTranslateY + pillOnPressExtraTranslateY` while dragging.
+ * Added to `pillDragRestTranslateY` when idle / fading out (not dragging). Smaller = pill sits
+ * higher on screen. Kept separate from `pillOnPressExtraTranslateY` so only the default position moves.
  */
-const pillHiddenOffsetY = 50;
+const pillHiddenOffsetY = 42;
 
 /** Added to `pillDragRestTranslateY` while dragging (positive = lower on screen vs base rest). */
 const pillOnPressExtraTranslateY = 24;
@@ -261,8 +261,7 @@ export const percentageSliderTokens = {
 
   // Snapping
   snapPoints,
-  snapThresholdPx,
-  snapSlackTrackPx,
+  snapMagnetHalfWidthPct,
 
   // Motion
   spring: {

@@ -56,7 +56,7 @@ function parseAmountInputForDeDE(raw: string): number | null {
 const EMPTY_FIELD_ZERO_PCT_MS = 160;
 
 export function CryptoSliderScreen({ onBack }: Props) {
-  const { colors, themeId, setThemeId } = useTheme();
+  const { colors, themeId, setThemeId, isDark } = useTheme();
   const [percentage, setPercentage] = useState(0);
   const [amountInput, setAmountInput] = useState('');
   const amountInputRef = useRef<TextInput>(null);
@@ -316,6 +316,7 @@ export function CryptoSliderScreen({ onBack }: Props) {
                     refocusAmountInput();
                   }}
                   keyboardType="decimal-pad"
+                  keyboardAppearance={isDark ? 'dark' : 'light'}
                   underlineColorAndroid="transparent"
                   selectionColor={colors.accent}
                   style={styles.amountInput}

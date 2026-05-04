@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Animated,
   Easing,
@@ -12,7 +19,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { hapticLight, hapticMedium } from '../../utils/haptics';
+import { hapticHeavy, hapticLight } from '../../utils/haptics';
 import { lightSliderLayout } from '../../theme/light/responsive';
 import { useTheme } from '../../theme/ThemeContext';
 import { percentageSliderTokens as t } from './percentageSliderTokens';
@@ -125,8 +132,7 @@ function snapToNearest(pct: number, trackWidthPx: number): number {
   const nearest = [...t.snapPoints].reduce((prev, curr) =>
     Math.abs(curr - pct) < Math.abs(prev - pct) ? curr : prev,
   );
-  const pxSlackAsPct = (t.snapSlackTrackPx / trackWidthPx) * 100;
-  const slackPct = Math.max(t.snapThresholdPx, pxSlackAsPct);
+  const slackPct = t.snapMagnetHalfWidthPct;
   return Math.abs(nearest - pct) <= slackPct ? nearest : pct;
 }
 
@@ -217,6 +223,8 @@ export function PercentageSlider({
   const pillTranslateY = useRef(
     new Animated.Value(t.pillDragRestTranslateY + t.pillHiddenOffsetY),
   ).current;
+  /** 0 = inactive track chrome, 1 = active track + fill — crossfades around 0% / 100% instead of hard-switching. */
+  const chromeBlend = useRef(new Animated.Value(initial > 0 ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.timing(headerOpacity, {
@@ -227,23 +235,17 @@ export function PercentageSlider({
   }, [dragging, headerOpacity]);
 
   useEffect(() => {
+    trackHeightAnim.stopAnimation();
     const toH = dragging
       ? m.sliderContainerHeight
       : m.sliderTrackHeightCollapsed;
     Animated.spring(trackHeightAnim, {
       toValue: toH,
       useNativeDriver: false,
-      speed: m.sliderTrackHeightSpring.speed,
-      bounciness: m.sliderTrackHeightSpring.bounciness,
+      speed: t.sliderTrackHeightSpring.speed,
+      bounciness: t.sliderTrackHeightSpring.bounciness,
     }).start();
-  }, [
-    dragging,
-    m.sliderContainerHeight,
-    m.sliderTrackHeightCollapsed,
-    m.sliderTrackHeightSpring.bounciness,
-    m.sliderTrackHeightSpring.speed,
-    trackHeightAnim,
-  ]);
+  }, [dragging, m.sliderContainerHeight, m.sliderTrackHeightCollapsed, trackHeightAnim]);
 
   useEffect(() => {
     const duration = dragging ? t.pillAnimateInMs : t.pillAnimateOutMs;
@@ -268,23 +270,44 @@ export function PercentageSlider({
     ]).start();
   }, [dragging, pillOpacity, pillTranslateY]);
 
+  /**
+   * Crossfade inactive ↔ active track chrome. Uses the JS driver so it composes cleanly with
+   * layout-driven fills (`fillWidth`, `trackChromeBorderRadiusAnim`). Stops any in-flight blend
+   * before starting a new target to avoid stuck / flicker when `showActiveChrome` flips quickly.
+   */
+  useLayoutEffect(() => {
+    chromeBlend.stopAnimation();
+    const to = showActiveChrome ? 1 : 0;
+    Animated.timing(chromeBlend, {
+      toValue: to,
+      duration: showActiveChrome ? 120 : t.pillAnimateOutMs,
+      easing: showActiveChrome
+        ? Easing.out(Easing.cubic)
+        : Easing.in(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [showActiveChrome, chromeBlend]);
+
   const hCollapsed = m.sliderTrackHeightCollapsed;
   const hExpanded = m.sliderContainerHeight;
   const heightOk = hExpanded > hCollapsed + 0.5;
 
-  const thumbChromeScale = useMemo(
+  const inactiveTrackOpacity = useMemo(
     () =>
-      heightOk
-        ? trackHeightAnim.interpolate({
-            inputRange: [hCollapsed, hExpanded],
-            outputRange: [hCollapsed / hExpanded, 1],
-            extrapolate: 'clamp',
-          })
-        : trackHeightAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [1, 1],
-          }),
-    [heightOk, hCollapsed, hExpanded, trackHeightAnim],
+      chromeBlend.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 0],
+      }),
+    [chromeBlend],
+  );
+
+  const activeTrackOpacity = useMemo(
+    () =>
+      chromeBlend.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+      }),
+    [chromeBlend],
   );
 
   const rulerHeightAnim = useMemo(
@@ -395,8 +418,8 @@ export function PercentageSlider({
   const gestureEndedRef = useRef(false);
   /** Whole-percent step for light haptic while dragging; `null` until first move primes the baseline. */
   const lastDragHapticRoundRef = useRef<number | null>(null);
-  /** Dedupes medium “snap value” haptics across drag + release in one gesture. */
-  const lastSnapMediumRoundedRef = useRef<number | null>(null);
+  /** Dedupes milestone (0 / 25 / 50 / 75 / 100) heavy haptics across drag + release in one gesture. */
+  const lastMilestoneHeavyRoundedRef = useRef<number | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -413,7 +436,7 @@ export function PercentageSlider({
   };
 
   const handleMaxPress = useCallback(() => {
-    hapticMedium();
+    hapticLight();
     if (!onChangeRef.current) {
       onMaxPress?.();
       return;
@@ -429,6 +452,7 @@ export function PercentageSlider({
       }
       maxSpringActiveRef.current = true;
       onChangeRef.current?.(100);
+      hapticHeavy();
       setLivePct(100);
       Animated.spring(animatedValue, {
         toValue: target,
@@ -472,19 +496,19 @@ export function PercentageSlider({
     const next = release ? snapToNearest(pct, tw) : pct;
     const snapValues = t.snapPoints as readonly number[];
     const isSnapRounded = (r: number) => snapValues.includes(r);
-    const trySnapMedium = (r: number) => {
+    const tryMilestoneHeavy = (r: number) => {
       if (!isSnapRounded(r)) return;
-      if (lastSnapMediumRoundedRef.current === r) return;
-      lastSnapMediumRoundedRef.current = r;
-      hapticMedium();
+      if (lastMilestoneHeavyRoundedRef.current === r) return;
+      lastMilestoneHeavyRoundedRef.current = r;
+      hapticHeavy();
     };
 
     if (release) {
       if (Math.abs(next - pct) > 1e-6 && snapValues.includes(next)) {
-        trySnapMedium(Math.round(next));
+        tryMilestoneHeavy(Math.round(next));
       }
       lastDragHapticRoundRef.current = null;
-      lastSnapMediumRoundedRef.current = null;
+      lastMilestoneHeavyRoundedRef.current = null;
     } else {
       const rounded = Math.round(next);
       if (lastDragHapticRoundRef.current === null) {
@@ -492,7 +516,7 @@ export function PercentageSlider({
       } else if (lastDragHapticRoundRef.current !== rounded) {
         lastDragHapticRoundRef.current = rounded;
         if (isSnapRounded(rounded)) {
-          trySnapMedium(rounded);
+          tryMilestoneHeavy(rounded);
         } else {
           hapticLight();
         }
@@ -554,9 +578,10 @@ export function PercentageSlider({
       onPanResponderGrant: (_, gestureState) => {
         gestureEndedRef.current = false;
         lastDragHapticRoundRef.current = null;
-        lastSnapMediumRoundedRef.current = null;
+        lastMilestoneHeavyRoundedRef.current = null;
         clearMaxAnimListener();
         maxSpringActiveRef.current = false;
+        hapticLight();
         const grantToken = ++layoutTokenRef.current;
         setDraggingTracked(true);
         trackRef.current?.measure(
@@ -761,10 +786,7 @@ export function PercentageSlider({
               bottom: pillBottomAnim,
               alignSelf: 'center',
               opacity: pillOpacity,
-              transform: [
-                { translateY: pillTranslateY },
-                { scale: thumbChromeScale },
-              ],
+              transform: [{ translateY: pillTranslateY }],
             }}
           >
             <View
@@ -807,30 +829,37 @@ export function PercentageSlider({
             { borderRadius: trackChromeBorderRadiusAnim },
           ]}
         >
-          {!showActiveChrome ? (
-            <View style={[StyleSheet.absoluteFill, palette.inactiveUniform]} />
-          ) : (
-            <>
-              <View style={[StyleSheet.absoluteFill, palette.trackBase]} />
-              <Animated.View
-                style={[
-                  styles.draggingFill,
-                  palette.draggingFill,
-                  {
-                    width: fillWidth,
-                    borderTopLeftRadius: trackChromeBorderRadiusAnim,
-                    borderBottomLeftRadius: trackChromeBorderRadiusAnim,
-                    borderTopRightRadius: 0,
-                    borderBottomRightRadius: 0,
-                  },
-                ]}
-              />
-            </>
-          )}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              palette.inactiveUniform,
+              { opacity: inactiveTrackOpacity },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { opacity: activeTrackOpacity }]}
+          >
+            <View style={[StyleSheet.absoluteFill, palette.trackBase]} />
+            <Animated.View
+              style={[
+                styles.draggingFill,
+                palette.draggingFill,
+                {
+                  width: fillWidth,
+                  borderTopLeftRadius: trackChromeBorderRadiusAnim,
+                  borderBottomLeftRadius: trackChromeBorderRadiusAnim,
+                  borderTopRightRadius: 0,
+                  borderBottomRightRadius: 0,
+                },
+              ]}
+            />
+          </Animated.View>
 
           <View style={styles.tickRow} pointerEvents="none">
             {t.tickPercents.map(pct => {
-              const onFill = showActiveChrome && livePct > pct;
+              const onFill = livePct > pct;
               const half = t.tickSize / 2;
               const left =
                 trackWidth > 0 ? (pct / 100) * trackWidth - half : 0;
