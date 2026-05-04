@@ -132,8 +132,7 @@ function snapToNearest(pct: number, trackWidthPx: number): number {
   const nearest = [...t.snapPoints].reduce((prev, curr) =>
     Math.abs(curr - pct) < Math.abs(prev - pct) ? curr : prev,
   );
-  const pxSlackAsPct = (t.snapSlackTrackPx / trackWidthPx) * 100;
-  const slackPct = Math.max(t.snapThresholdPx, pxSlackAsPct);
+  const slackPct = t.snapMagnetHalfWidthPct;
   return Math.abs(nearest - pct) <= slackPct ? nearest : pct;
 }
 

@@ -112,16 +112,10 @@ const tickPercents = [25, 50, 75] as const;
 const snapPoints = [0, 25, 50, 75, 100] as const;
 
 /**
- * Minimum slack in **percentage points** (used with pixel slack below). Keeps quarter
- * marks easy to hit on very wide tracks where px→% is tiny.
+ * Half-width of the snap band in **percentage points** (release only). If the nearest snap
+ * is within this distance, we jump to it — e.g. for 75% with `2`, the band is 73–77.
  */
-const snapThresholdPx = 8;
-
-/**
- * Extra slack in **track pixels** on release: converted to % via track width so snapping
- * feels consistent across screen sizes (narrower track = wider % magnet).
- */
-const snapSlackTrackPx = 18;
+const snapMagnetHalfWidthPct = 2;
 
 // -----------------------------------------------------------------------------
 // Motion — `Animated.spring` for thumb fill
@@ -267,8 +261,7 @@ export const percentageSliderTokens = {
 
   // Snapping
   snapPoints,
-  snapThresholdPx,
-  snapSlackTrackPx,
+  snapMagnetHalfWidthPct,
 
   // Motion
   spring: {
